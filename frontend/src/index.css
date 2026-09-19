@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+
+  font-family:
+    "Segoe UI",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+
+  background: #f7f3ea;
+  color: #1f2937;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select {
+  min-width: 0;
+}
+
+::selection {
+  background: #dcebdc;
+  color: #1a3b21;
+}
+
+/* -------------------------------------------------
+   BBP Wildlife Background
+-------------------------------------------------- */
+
+.zoo-page {
+  position: relative;
+  min-height: 100vh;
+  background: #f7faf7;
+  isolation: isolate;
+}
+
+.zoo-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  background:
+    radial-gradient(
+      ellipse at 15% 20%,
+      rgba(42, 92, 48, 0.035) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 85% 70%,
+      rgba(42, 92, 48, 0.03) 0%,
+      transparent 45%
+    );
+
+  opacity: 1;
+}
+
+/* Very faint curved tiger-like markings */
+.zoo-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='700' viewBox='0 0 900 700'%3E%3Cg fill='none' stroke='%2352694f' stroke-width='10' stroke-linecap='round' opacity='.045'%3E%3Cpath d='M-80 90 C80 20 170 150 300 80 S520 10 650 100 S800 160 980 70'/%3E%3Cpath d='M-100 240 C70 150 190 300 330 220 S540 150 680 260 S820 310 1000 200'/%3E%3Cpath d='M-80 410 C90 320 180 470 330 390 S540 320 700 430 S850 470 1000 370'/%3E%3Cpath d='M-100 580 C70 500 190 640 340 560 S550 490 700 600 S850 650 1000 550'/%3E%3C/g%3E%3C/svg%3E");
+
+  background-size: 900px 700px;
+  background-repeat: repeat;
+  opacity: 0.7;
+}
