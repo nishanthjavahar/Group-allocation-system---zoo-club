@@ -488,19 +488,24 @@ function buildReportHtml(data) {
           /* GROUPS */
 
           .group-section {
-            margin-bottom: 17px;
-          }
+  margin-bottom: 17px;
+
+  /* Keep each complete group together */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
 
           .group-heading {
-            display: flex;
-            align-items: baseline;
-            gap: 7px;
-            margin: 7px 0 5px;
-            break-inside: avoid;
-            page-break-inside: avoid;
-            break-after: avoid;
-            page-break-after: avoid;
-          }
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 7px 0 5px;
+
+  break-inside: avoid;
+  page-break-inside: avoid;
+  break-after: avoid;
+  page-break-after: avoid;
+}
 
           .group-title {
             font-size: 11pt;
@@ -514,14 +519,24 @@ function buildReportHtml(data) {
           }
 
           .group-table {
-            width: 100%;
-          }
+  width: 100%;
+
+  /* Never split a group table between pages */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
 
           .group-table th,
           .group-table td {
             vertical-align: middle;
           }
-
+          .group-table thead {
+  display: table-header-group;
+}
+        .group-table tbody {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
           .sl-column {
             width: 12%;
             text-align: center;
