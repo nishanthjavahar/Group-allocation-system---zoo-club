@@ -7,8 +7,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const puppeteer = require("puppeteer");
-
+const puppeteer = require("puppeteer-core");
+const chromium = require("@sparticuz/chromium");
 const { ORGANISATION, LOGO_FILENAME } = require("../config/constants");
 
 /* =========================================================
@@ -981,9 +981,10 @@ async function generateGroupAllocationPdf(data) {
 
   try {
     browser = await puppeteer.launch({
-      headless: "new",
-
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: true,
     });
 
     const page = await browser.newPage();
