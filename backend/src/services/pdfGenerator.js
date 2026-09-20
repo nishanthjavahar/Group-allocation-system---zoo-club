@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer-core");
 const chromium = require("@sparticuz/chromium");
+const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
 
 const { ORGANISATION, LOGO_FILENAME } = require("../config/constants");
 
@@ -41,6 +42,7 @@ function loadLogoAsDataUri() {
 
   try {
     const buffer = fs.readFileSync(logoPath);
+
     const extension = path.extname(logoPath).replace(".", "").toLowerCase();
 
     const mimeTypes = {
@@ -119,6 +121,7 @@ function renderAgeDistributionTable(ageDistribution = []) {
           <th>Students</th>
         </tr>
       </thead>
+
       <tbody>
         ${rows}
       </tbody>
@@ -137,13 +140,18 @@ function renderGroupTable(group) {
     .map(
       (student, index) => `
         <tr>
-          <td class="serial-number">${index + 1}</td>
+          <td class="serial-number">
+            ${index + 1}
+          </td>
+
           <td class="student-name">
             ${escapeHtml(student.name)}
           </td>
+
           <td>
             ${escapeHtml(student.dobDisplay || student.dob || "")}
           </td>
+
           <td class="age-cell">
             ${escapeHtml(student.age)}
           </td>
@@ -154,6 +162,7 @@ function renderGroupTable(group) {
 
   return `
     <section class="group-section">
+
       <div class="group-heading">
         <div class="group-title">
           Group ${escapeHtml(group.groupNumber)}
@@ -165,18 +174,31 @@ function renderGroupTable(group) {
       </div>
 
       <table class="group-table">
+
         <thead>
           <tr>
-            <th class="sl-column">Sl. No.</th>
-            <th class="student-name-column">Student Name</th>
-            <th class="dob-column">Date of Birth</th>
-            <th class="age-column">Age</th>
+            <th class="sl-column">
+              Sl. No.
+            </th>
+
+            <th class="student-name-column">
+              Student Name
+            </th>
+
+            <th class="dob-column">
+              Date of Birth
+            </th>
+
+            <th class="age-column">
+              Age
+            </th>
           </tr>
         </thead>
 
         <tbody>
           ${rows}
         </tbody>
+
       </table>
     </section>
   `;
@@ -225,6 +247,7 @@ function buildHeaderTemplate(logoDataUri) {
         color:#1f2d1f;
       "
     >
+
       ${logo}
 
       <div
@@ -236,6 +259,7 @@ function buildHeaderTemplate(logoDataUri) {
           line-height:1.05;
         "
       >
+
         <div
           style="
             font-size:15px;
@@ -279,42 +303,89 @@ function buildHeaderTemplate(logoDataUri) {
           <strong>Generated:</strong>
           ${formatReportDate()}
         </div>
+
       </div>
     </div>
   `;
 }
 
 /* =========================================================
-   FOOTER
+   PDF FOOTER
 ========================================================= */
 
-function buildFooterTemplate() {
-  return `
-    <div
-      style="
-        width:100%;
-        padding-top:4px;
-        border-top:1px solid #d9ded9;
-        font-family:Arial,Helvetica,sans-serif;
-        font-size:8px;
-        color:#777;
-        text-align:center;
-      "
-    >
-      <span>
-        ${escapeHtml(ORGANISATION.name)}
-        &nbsp;&middot;&nbsp;
-        ${escapeHtml(ORGANISATION.programme)}
-      </span>
+/*
+ * Page numbers are added after Puppeteer creates the PDF.
+ *
+ * This avoids relying on Puppeteer's:
+ *   pageNumber
+ *   totalPages
+ *
+ * placeholders, which were rendering as blank.
+ */
 
-      &nbsp;&nbsp;|&nbsp;&nbsp;
+async function addPdfFooter(pdfBuffer) {
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
 
-      Page
-      <span class="pageNumber"></span>
-      of
-      <span class="totalPages"></span>
-    </div>
-  `;
+  const pages = pdfDoc.getPages();
+
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const fontSize = 6.5;
+
+  const footerColor = rgb(0.47, 0.47, 0.47);
+
+  const lineColor = rgb(0.85, 0.87, 0.85);
+
+  const totalPages = pages.length;
+
+  const organisationName = ORGANISATION.name || "";
+
+  const programme = ORGANISATION.programme || "";
+
+  for (let index = 0; index < pages.length; index++) {
+    const page = pages[index];
+
+    const { width } = page.getSize();
+
+    const pageNumber = index + 1;
+
+    const footerText =
+      `${organisationName} · ${programme} | ` +
+      `Page ${pageNumber} of ${totalPages}`;
+
+    const textWidth = font.widthOfTextAtSize(footerText, fontSize);
+
+    const x = (width - textWidth) / 2;
+
+    /*
+     * Bottom footer area.
+     * A4 height is approximately 842pt.
+     * The PDF already reserves 18mm at the bottom.
+     */
+
+    page.drawLine({
+      start: {
+        x: 42,
+        y: 34,
+      },
+      end: {
+        x: width - 42,
+        y: 34,
+      },
+      thickness: 0.6,
+      color: lineColor,
+    });
+
+    page.drawText(footerText, {
+      x,
+      y: 20,
+      size: fontSize,
+      font,
+      color: footerColor,
+    });
+  }
+
+  return Buffer.from(await pdfDoc.save());
 }
 
 /* =========================================================
@@ -335,7 +406,9 @@ function buildReportHtml(data) {
     <!DOCTYPE html>
 
     <html lang="en">
+
       <head>
+
         <meta charset="UTF-8" />
 
         <meta
@@ -348,6 +421,7 @@ function buildReportHtml(data) {
         </title>
 
         <style>
+
           @page {
             size: A4;
             margin: 38mm 15mm 18mm 15mm;
@@ -369,27 +443,41 @@ function buildReportHtml(data) {
               Arial,
               Helvetica,
               sans-serif;
+
             color: #1f2d1f;
+
             font-size: 10pt;
+
             line-height: 1.4;
           }
 
-          /* SUMMARY */
+          /* =================================================
+             SUMMARY
+          ================================================= */
 
           .summary-grid {
             display: flex;
+
             width: 100%;
+
             background: #f2f7f2;
+
             border: 1px solid #d5e3d5;
+
             border-radius: 7px;
+
             overflow: hidden;
+
             margin: 10px 0 18px;
           }
 
           .summary-item {
             flex: 1;
+
             padding: 10px 12px;
+
             text-align: center;
+
             border-right: 1px solid #d5e3d5;
           }
 
@@ -399,42 +487,63 @@ function buildReportHtml(data) {
 
           .summary-label {
             display: block;
+
             color: #666;
+
             font-size: 8.5pt;
+
             margin-bottom: 2px;
           }
 
           .summary-value {
             display: block;
+
             color: #2f6b3a;
+
             font-size: 12pt;
+
             font-weight: 800;
           }
 
-          /* SECTION HEADINGS */
+          /* =================================================
+             SECTION HEADINGS
+          ================================================= */
 
           .section-heading {
             display: flex;
+
             align-items: center;
+
             gap: 10px;
+
             margin: 18px 0 8px;
+
             color: #2f6b3a;
+
             font-size: 11.5pt;
+
             font-weight: 800;
           }
 
           .section-heading::after {
             content: "";
+
             height: 1px;
+
             flex: 1;
+
             background: #d9e3d9;
           }
 
-          /* TABLES */
+          /* =================================================
+             TABLES
+          ================================================= */
 
           table {
             width: 100%;
+
             border-collapse: collapse;
+
             border-spacing: 0;
           }
 
@@ -444,23 +553,33 @@ function buildReportHtml(data) {
 
           tr {
             break-inside: avoid;
+
             page-break-inside: avoid;
           }
 
           th {
             background: #2f6b3a;
+
             color: #ffffff;
+
             font-size: 9pt;
+
             font-weight: 700;
+
             padding: 6px 8px;
+
             border: 1px solid #2f6b3a;
+
             text-align: left;
           }
 
           td {
             font-size: 9pt;
+
             padding: 5px 8px;
+
             border: 1px solid #d0d8d0;
+
             color: #293229;
           }
 
@@ -468,10 +587,13 @@ function buildReportHtml(data) {
             background: #f7faf7;
           }
 
-          /* AGE DISTRIBUTION */
+          /* =================================================
+             AGE DISTRIBUTION
+          ================================================= */
 
           .age-distribution-table {
             width: 280px;
+
             margin-bottom: 16px;
           }
 
@@ -485,60 +607,85 @@ function buildReportHtml(data) {
             width: 50%;
           }
 
-          /* GROUPS */
+          /* =================================================
+             GROUPS
+          ================================================= */
+
+          /*
+           * IMPORTANT:
+           * A complete group must stay together.
+           */
 
           .group-section {
-  margin-bottom: 17px;
+            margin-bottom: 17px;
 
-  /* Keep each complete group together */
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
+            break-before: auto;
+
+            page-break-before: auto;
+
+            break-inside: avoid;
+
+            page-break-inside: avoid;
+          }
 
           .group-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  margin: 7px 0 5px;
+            display: flex;
 
-  break-inside: avoid;
-  page-break-inside: avoid;
-  break-after: avoid;
-  page-break-after: avoid;
-}
+            align-items: baseline;
+
+            gap: 7px;
+
+            margin: 7px 0 5px;
+
+            break-inside: avoid;
+
+            page-break-inside: avoid;
+
+            break-after: avoid;
+
+            page-break-after: avoid;
+          }
 
           .group-title {
             font-size: 11pt;
+
             font-weight: 800;
+
             color: #1f2d1f;
           }
 
           .group-count {
             font-size: 9pt;
+
             color: #777;
           }
 
           .group-table {
-  width: 100%;
+            width: 100%;
 
-  /* Never split a group table between pages */
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
+            break-inside: avoid;
+
+            page-break-inside: avoid;
+          }
+
+          .group-table thead {
+            display: table-header-group;
+          }
+
+          .group-table tbody {
+            break-inside: avoid;
+
+            page-break-inside: avoid;
+          }
 
           .group-table th,
           .group-table td {
             vertical-align: middle;
           }
-          .group-table thead {
-  display: table-header-group;
-}
-        .group-table tbody {
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
+
           .sl-column {
             width: 12%;
+
             text-align: center;
           }
 
@@ -556,6 +703,7 @@ function buildReportHtml(data) {
 
           .age-column {
             width: 15%;
+
             text-align: center;
           }
 
@@ -565,6 +713,7 @@ function buildReportHtml(data) {
 
           .age-cell {
             text-align: center;
+
             font-weight: 600;
           }
 
@@ -572,13 +721,20 @@ function buildReportHtml(data) {
             break-inside: avoid;
           }
 
+          /* =================================================
+             PRINT
+          ================================================= */
+
           @media print {
             body {
               -webkit-print-color-adjust: exact;
+
               print-color-adjust: exact;
             }
           }
+
         </style>
+
       </head>
 
       <body>
@@ -588,6 +744,7 @@ function buildReportHtml(data) {
         <div class="summary-grid">
 
           <div class="summary-item">
+
             <span class="summary-label">
               Total Students
             </span>
@@ -595,9 +752,12 @@ function buildReportHtml(data) {
             <span class="summary-value">
               ${totalStudents}
             </span>
+
           </div>
 
+
           <div class="summary-item">
+
             <span class="summary-label">
               Total Groups
             </span>
@@ -605,9 +765,12 @@ function buildReportHtml(data) {
             <span class="summary-value">
               ${numberOfGroups}
             </span>
+
           </div>
 
+
           <div class="summary-item">
+
             <span class="summary-label">
               Average per Group
             </span>
@@ -615,9 +778,11 @@ function buildReportHtml(data) {
             <span class="summary-value">
               ${averagePerGroup}
             </span>
+
           </div>
 
         </div>
+
 
         <!-- AGE DISTRIBUTION -->
 
@@ -626,6 +791,7 @@ function buildReportHtml(data) {
         </h2>
 
         ${renderAgeDistributionTable(ageDistribution)}
+
 
         <!-- GROUP ALLOCATION -->
 
@@ -636,6 +802,7 @@ function buildReportHtml(data) {
         ${groups.map(renderGroupTable).join("")}
 
       </body>
+
     </html>
   `;
 }
@@ -649,12 +816,11 @@ async function generateGroupAllocationPdf(data) {
 
   try {
     const html = buildReportHtml(data);
+
     const logoDataUri = loadLogoAsDataUri();
 
     /*
-     * IMPORTANT:
      * Chromium is supplied by @sparticuz/chromium.
-     * Puppeteer does NOT search for its own Chrome installation.
      */
     const executablePath = await chromium.executablePath();
 
@@ -662,8 +828,11 @@ async function generateGroupAllocationPdf(data) {
 
     browser = await puppeteer.launch({
       executablePath,
+
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+
       defaultViewport: chromium.defaultViewport,
+
       headless: true,
     });
 
@@ -687,14 +856,24 @@ async function generateGroupAllocationPdf(data) {
       });
     }
 
+    /*
+     * Puppeteer creates the repeating header.
+     *
+     * Footer is intentionally left blank because
+     * page numbers are added reliably afterward
+     * using pdf-lib.
+     */
+
     const pdfBuffer = await page.pdf({
       format: "A4",
+
       printBackground: true,
+
       displayHeaderFooter: true,
 
       headerTemplate: buildHeaderTemplate(logoDataUri),
 
-      footerTemplate: buildFooterTemplate(),
+      footerTemplate: "<div></div>",
 
       margin: {
         top: "38mm",
@@ -706,7 +885,17 @@ async function generateGroupAllocationPdf(data) {
       preferCSSPageSize: false,
     });
 
-    return pdfBuffer;
+    /*
+     * Add reliable:
+     *
+     * Page 1 of 3
+     * Page 2 of 3
+     * Page 3 of 3
+     */
+
+    const finalPdf = await addPdfFooter(pdfBuffer);
+
+    return finalPdf;
   } catch (error) {
     console.error("PDF generation error:", error);
 
