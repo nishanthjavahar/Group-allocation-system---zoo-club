@@ -144,6 +144,7 @@ export async function downloadGroupsPdf(
   students,
   numberOfGroups,
   include = ["name", "dob", "age"],
+  title = "Group Allocation Report",
 ) {
   try {
     const response = await client.post(
@@ -152,6 +153,7 @@ export async function downloadGroupsPdf(
         students,
         numberOfGroups,
         include,
+        title,
       },
       {
         responseType: "blob",

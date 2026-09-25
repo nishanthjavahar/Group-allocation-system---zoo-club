@@ -40,15 +40,29 @@ export default function Home() {
 
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const [showPdfOptions, setShowPdfOptions] = useState(false);
+  /*
+   * PDF report title.
+   *
+   * This is shown in the PDF options popup and can be
+   * changed before every PDF is generated.
+   */
+  const [pdfTitle, setPdfTitle] = useState("Zoo Club 2026 - 2027");
 
+  /*
+   * PDF fields.
+   *
+   * Student Name is selected by default.
+   */
   const [pdfFields, setPdfFields] = useState({
     name: true,
     dob: false,
     age: false,
   });
 
+  const [showPdfOptions, setShowPdfOptions] = useState(false);
+
   const [result, setResult] = useState(null);
+
   // Students excluded because of the selected age criteria.
   const [excludedStudents, setExcludedStudents] = useState([]);
 
@@ -89,6 +103,7 @@ export default function Home() {
      * The Excel parser is already returning the students correctly.
      * We must store them in Home state.
      */
+
     const importedStudents = Array.isArray(students) ? students : [];
 
     console.log("HOME RECEIVED EXCEL STUDENTS:", importedStudents);
@@ -134,6 +149,7 @@ export default function Home() {
      * Show field validation only after the user presses
      * Generate Groups.
      */
+
     setShowValidationErrors(true);
 
     const studentCount = nonEmptyStudents.length;
@@ -149,6 +165,7 @@ export default function Home() {
     /*
      * Stop if basic form validation fails.
      */
+
     if (validationProblems.length > 0) {
       setErrors(validationProblems);
       setExcludedStudents([]);
@@ -160,6 +177,7 @@ export default function Home() {
     /*
      * Clear previous errors.
      */
+
     setErrors([]);
 
     setIsGenerating(true);
@@ -176,6 +194,7 @@ export default function Home() {
       /*
        * Successful generation.
        */
+
       setResult(data);
 
       setExcludedStudents(
@@ -192,6 +211,7 @@ export default function Home() {
        *   excludedStudents: [...]
        * }
        */
+
       if (err.requiresConfirmation) {
         setExcludedStudents(
           Array.isArray(err.excludedStudents) ? err.excludedStudents : [],
@@ -206,6 +226,7 @@ export default function Home() {
       /*
        * Normal validation/application error.
        */
+
       setErrors(err.details || [err.message || "Unable to generate groups."]);
 
       setExcludedStudents([]);
@@ -216,7 +237,7 @@ export default function Home() {
   }
 
   // =========================================================
-  // DOWNLOAD PDF
+  // PDF DOWNLOAD OPTIONS
   // =========================================================
 
   function openPdfOptions() {
@@ -237,13 +258,37 @@ export default function Home() {
     }));
   }
 
+  // =========================================================
+  // DOWNLOAD PDF
+  // =========================================================
+
   async function handleDownloadPdf() {
+    const title = pdfTitle.trim();
+
+    /*
+     * Make sure the user entered a title.
+     */
+
+    if (!title) {
+      setErrors(["Please enter a report title."]);
+      return;
+    }
+
+    /*
+     * Find which student fields were selected.
+     */
+
     const include = Object.entries(pdfFields)
       .filter(([, selected]) => selected)
       .map(([field]) => field);
 
+    /*
+     * At least one field must be selected.
+     */
+
     if (include.length === 0) {
       setErrors(["Please select at least one student field for the PDF."]);
+
       return;
     }
 
@@ -254,7 +299,12 @@ export default function Home() {
         nonEmptyStudents,
         Number(numberOfGroups),
         include,
+        title,
       );
+
+      /*
+       * Close the popup after successful generation.
+       */
 
       setShowPdfOptions(false);
     } catch (err) {
@@ -274,6 +324,7 @@ export default function Home() {
        * Everything inside this wrapper sits above the
        * very-light wildlife/tiger background.
        */}
+
       <div className="relative z-10">
         {/* =================================================
             HEADER
@@ -501,13 +552,14 @@ export default function Home() {
             </div>
           )}
         </main>
-        {/* =================================================
-    PDF OPTIONS MODAL
-================================================= */}
+
+        {/* =====================================================
+            PDF DOWNLOAD OPTIONS MODAL
+        ===================================================== */}
 
         {showPdfOptions && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="pdf-options-title"
@@ -517,69 +569,151 @@ export default function Home() {
               }
             }}
           >
-            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3
-                    id="pdf-options-title"
-                    className="text-lg font-bold text-forest-900"
-                  >
-                    PDF Download Options
-                  </h3>
+            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+              {/* =================================================
+                  MODAL HEADER
+              ================================================= */}
 
-                  <p className="mt-1 text-sm text-gray-500">
-                    Choose the student information you want to include.
+              <div className="border-b border-gray-100 px-5 py-5 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3
+                      id="pdf-options-title"
+                      className="text-lg font-bold text-forest-900"
+                    >
+                      PDF Download Options
+                    </h3>
+
+                    <p className="mt-1 text-sm text-gray-500">
+                      Customize the report before generating the PDF.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closePdfOptions}
+                    disabled={isDownloading}
+                    className="rounded-lg p-1 text-xl leading-none text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                    aria-label="Close"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              {/* =================================================
+                  MODAL BODY
+              ================================================= */}
+
+              <div className="space-y-5 px-5 py-5 sm:px-6">
+                {/* =================================================
+                    REPORT TITLE
+                ================================================= */}
+
+                <div>
+                  <label
+                    htmlFor="pdf-title"
+                    className="mb-2 block text-sm font-semibold text-gray-700"
+                  >
+                    Report Title
+                  </label>
+
+                  <input
+                    id="pdf-title"
+                    type="text"
+                    value={pdfTitle}
+                    onChange={(event) => setPdfTitle(event.target.value)}
+                    placeholder="Enter report title"
+                    disabled={isDownloading}
+                    maxLength={120}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-forest-500 focus:ring-2 focus:ring-forest-100 disabled:bg-gray-100"
+                  />
+
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    This title will appear in the PDF report.
                   </p>
                 </div>
 
+                {/* =================================================
+                    PDF FIELDS
+                ================================================= */}
+
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-gray-700">
+                    Information to include
+                  </p>
+
+                  <div className="space-y-2">
+                    {/* STUDENT NAME */}
+
+                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 transition hover:border-forest-200 hover:bg-forest-50/50">
+                      <input
+                        type="checkbox"
+                        checked={pdfFields.name}
+                        onChange={() => togglePdfField("name")}
+                        disabled={isDownloading}
+                        className="h-4 w-4 rounded border-gray-300 text-forest-600 focus:ring-forest-500"
+                      />
+
+                      <span className="text-sm font-medium text-gray-700">
+                        Student Name
+                      </span>
+                    </label>
+
+                    {/* DATE OF BIRTH */}
+
+                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 transition hover:border-forest-200 hover:bg-forest-50/50">
+                      <input
+                        type="checkbox"
+                        checked={pdfFields.dob}
+                        onChange={() => togglePdfField("dob")}
+                        disabled={isDownloading}
+                        className="h-4 w-4 rounded border-gray-300 text-forest-600 focus:ring-forest-500"
+                      />
+
+                      <span className="text-sm font-medium text-gray-700">
+                        Date of Birth
+                      </span>
+                    </label>
+
+                    {/* AGE */}
+
+                    <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 transition hover:border-forest-200 hover:bg-forest-50/50">
+                      <input
+                        type="checkbox"
+                        checked={pdfFields.age}
+                        onChange={() => togglePdfField("age")}
+                        disabled={isDownloading}
+                        className="h-4 w-4 rounded border-gray-300 text-forest-600 focus:ring-forest-500"
+                      />
+
+                      <span className="text-sm font-medium text-gray-700">
+                        Age
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* =================================================
+                    INFO
+                ================================================= */}
+
+                <div className="rounded-xl bg-gray-50 px-4 py-3 text-xs leading-5 text-gray-500">
+                  <strong>Sl. No.</strong> is always included for easy group
+                  reference.
+                </div>
+              </div>
+
+              {/* =================================================
+                  MODAL FOOTER
+              ================================================= */}
+
+              <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:px-6">
                 <button
                   type="button"
                   onClick={closePdfOptions}
                   disabled={isDownloading}
-                  aria-label="Close PDF options"
-                  className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                >
-                  <span className="text-xl leading-none">&times;</span>
-                </button>
-              </div>
-
-              <div className="mt-5 space-y-2">
-                {[
-                  { key: "name", label: "Student Name" },
-                  { key: "dob", label: "Date of Birth" },
-                  { key: "age", label: "Age" },
-                ].map((field) => (
-                  <label
-                    key={field.key}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 transition hover:border-forest-200 hover:bg-forest-50/50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={pdfFields[field.key]}
-                      onChange={() => togglePdfField(field.key)}
-                      disabled={isDownloading}
-                      className="h-4 w-4 rounded border-gray-300 text-forest-600 focus:ring-forest-500"
-                    />
-
-                    <span className="text-sm font-medium text-gray-700">
-                      {field.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-xs leading-5 text-gray-500">
-                Serial number is always included to keep the group list easy to
-                reference. Age Distribution is included only when{" "}
-                <strong>Age</strong> is selected.
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={closePdfOptions}
-                  disabled={isDownloading}
-                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -588,17 +722,18 @@ export default function Home() {
                   type="button"
                   onClick={handleDownloadPdf}
                   disabled={isDownloading}
-                  className="rounded-xl bg-forest-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-forest-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isDownloading ? "Preparing PDF..." : "Generate PDF"}
+                  {isDownloading ? "Generating..." : "Generate PDF"}
                 </button>
               </div>
             </div>
           </div>
         )}
-        {/* =================================================
+
+        {/* =====================================================
             FOOTER
-        ================================================= */}
+        ===================================================== */}
 
         <footer className="mt-10 border-t border-forest-100 bg-white/90">
           <div className="mx-auto flex max-w-[1400px] flex-col items-center justify-between gap-2 px-4 py-5 text-center sm:flex-row sm:px-8 sm:text-left lg:px-12">
@@ -627,6 +762,7 @@ export default function Home() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-sm">
           <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             {/* Modal header */}
+
             <div className="border-b border-gray-100 px-5 py-5 sm:px-6">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-lg">
@@ -646,6 +782,7 @@ export default function Home() {
             </div>
 
             {/* Modal body */}
+
             <div className="max-h-[50vh] overflow-y-auto px-5 py-4 sm:px-6">
               <div className="overflow-hidden rounded-xl border border-gray-200">
                 <div className="grid grid-cols-[1fr_auto] bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -681,6 +818,7 @@ export default function Home() {
             </div>
 
             {/* Modal actions */}
+
             <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
               <button
                 type="button"

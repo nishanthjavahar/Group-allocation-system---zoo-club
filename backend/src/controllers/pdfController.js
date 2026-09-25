@@ -1,8 +1,13 @@
 /**
  * pdfController.js
  *
- * Regenerates the allocation server-side from the same request body the
- * preview screen already has, then renders it to PDF.
+ * Handles PDF generation for group allocations.
+ *
+ * The frontend sends:
+ * - students
+ * - numberOfGroups
+ * - include  -> selected PDF fields
+ * - title    -> custom report title
  */
 
 const { validateGenerateRequest } = require("../utils/validation");
@@ -13,7 +18,7 @@ const { handleGroupError } = require("./errorHandling");
 /**
  * POST /api/groups/pdf
  *
- * Body:
+ * Request body:
  *
  * {
  *   students: [
@@ -22,54 +27,73 @@ const { handleGroupError } = require("./errorHandling");
  *       dob
  *     }
  *   ],
- *
- *   numberOfGroups: number,
- *
- *   include: [
- *     "name",
- *     "dob",
- *     "age"
- *   ]
+ *   numberOfGroups: 5,
+ *   include: ["name", "dob", "age"],
+ *   title: "Zoo Club 2026 - 2027"
  * }
  *
  * Response:
- * application/pdf binary stream
+ * application/pdf
  */
 async function downloadGroupsPdf(req, res) {
   try {
-    const { students: rawStudents, numberOfGroups, include } = req.body || {};
+    // --------------------------------------------------
+    // 1. READ REQUEST DATA
+    // --------------------------------------------------
 
-    /*
-     * Validate and enrich the student data.
-     */
+    const {
+      students: rawStudents,
+      numberOfGroups,
+      include,
+      title: rawTitle,
+    } = req.body || {};
+
+    // --------------------------------------------------
+    // 2. VALIDATE STUDENTS AND NUMBER OF GROUPS
+    // --------------------------------------------------
+
     const { students, numberOfGroups: groupCount } = validateGenerateRequest(
       rawStudents,
       numberOfGroups,
     );
 
-    /*
-     * Only these fields are allowed in the PDF.
-     */
+    // --------------------------------------------------
+    // 3. VALIDATE REPORT TITLE
+    // --------------------------------------------------
+
+    const title = typeof rawTitle === "string" ? rawTitle.trim() : "";
+
+    if (!title) {
+      return res.status(400).json({
+        error: "PDF generation failed.",
+        details: ["Please enter a report title."],
+      });
+    }
+
+    // --------------------------------------------------
+    // 4. VALIDATE PDF FIELDS
+    // --------------------------------------------------
+
     const allowedFields = new Set(["name", "dob", "age"]);
 
     /*
-     * If the frontend sends a selection,
-     * use it.
+     * If the frontend sends selected fields,
+     * use those fields.
      *
-     * If an older frontend sends no selection,
-     * preserve the old behaviour and include everything.
+     * If include is missing, keep the old behaviour
+     * and include all three fields.
      */
     const requestedFields = Array.isArray(include)
       ? include.filter((field) => allowedFields.has(field))
       : ["name", "dob", "age"];
 
     /*
-     * Remove duplicates.
+     * Remove duplicate fields.
      */
     const pdfFields = [...new Set(requestedFields)];
 
     /*
-     * Never generate a PDF with no student information.
+     * At least one field must be selected.
      */
     if (pdfFields.length === 0) {
       return res.status(400).json({
@@ -78,15 +102,16 @@ async function downloadGroupsPdf(req, res) {
       });
     }
 
-    /*
-     * Generate the exact same deterministic allocation
-     * used by the application.
-     */
+    // --------------------------------------------------
+    // 5. GENERATE GROUP ALLOCATION
+    // --------------------------------------------------
+
     const { groups, ageDistribution } = allocateGroups(students, groupCount);
 
-    /*
-     * Generate PDF with the selected fields.
-     */
+    // --------------------------------------------------
+    // 6. GENERATE PDF
+    // --------------------------------------------------
+
     const pdfBuffer = await generateGroupAllocationPdf({
       groups,
       ageDistribution,
@@ -96,18 +121,74 @@ async function downloadGroupsPdf(req, res) {
         numberOfGroups: groupCount,
       },
 
+      /*
+       * Selected fields:
+       *
+       * ["name"]
+       * ["name", "dob"]
+       * ["name", "age"]
+       * ["name", "dob", "age"]
+       */
       pdfFields,
+
+      /*
+       * Custom report title entered
+       * by the user.
+       */
+      title,
     });
+
+    // --------------------------------------------------
+    // 7. PDF RESPONSE
+    // --------------------------------------------------
 
     res.setHeader("Content-Type", "application/pdf");
 
+    // --------------------------------------------------
+    // 8. CREATE SAFE PDF FILENAME
+    // --------------------------------------------------
+
+    /*
+     * Convert the custom title into a safe filename.
+     *
+     * Example:
+     *
+     * Zoo Club 2026 - 2027
+     *       ↓
+     * Zoo Club 2026 - 2027.pdf
+     */
+
+    const safeFilename =
+      title
+        // Remove characters that are not safe in filenames
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+
+        // Convert multiple spaces into one
+        .replace(/\s+/g, " ")
+
+        // Remove spaces from beginning/end
+        .trim()
+
+        // Prevent extremely long filenames
+        .slice(0, 100) ||
+      // Fallback filename
+      "group-allocation-report";
+
     res.setHeader(
       "Content-Disposition",
-      'attachment; filename="zoo-club-group-allocation.pdf"',
+      `attachment; filename="${safeFilename}.pdf"`,
     );
+
+    // --------------------------------------------------
+    // 9. SEND PDF
+    // --------------------------------------------------
 
     res.send(pdfBuffer);
   } catch (err) {
+    // --------------------------------------------------
+    // 10. EXISTING ERROR HANDLER
+    // --------------------------------------------------
+
     handleGroupError(err, res);
   }
 }

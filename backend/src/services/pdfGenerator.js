@@ -330,7 +330,7 @@ function renderGroupTable(group, pdfFields) {
    HEADER
 ========================================================= */
 
-function buildHeaderTemplate(logoDataUri) {
+function buildHeaderTemplate(logoDataUri, title) {
   const logo = logoDataUri
     ? `
       <img
@@ -412,7 +412,7 @@ function buildHeaderTemplate(logoDataUri) {
             margin-top:6px;
           "
         >
-          ${escapeHtml(ORGANISATION.reportTitle)}
+          ${escapeHtml(title)}
         </div>
 
         <div
@@ -520,9 +520,25 @@ function buildReportHtml(data) {
     ageDistribution = [],
     summary = {},
     pdfFields: rawPdfFields,
+    title: rawTitle,
   } = data || {};
 
+  /*
+   * Normalise selected PDF fields.
+   *
+   * IMPORTANT:
+   * Do NOT declare pdfFields twice.
+   */
   const pdfFields = normalisePdfFields(rawPdfFields);
+
+  /*
+   * Use a safe fallback title if one is somehow
+   * missing from the request.
+   */
+  const title =
+    typeof rawTitle === "string" && rawTitle.trim()
+      ? rawTitle.trim()
+      : "Group Allocation Report";
 
   const totalStudents = Number(summary.totalStudents ?? 0);
 
@@ -546,7 +562,7 @@ function buildReportHtml(data) {
         />
 
         <title>
-          ${escapeHtml(ORGANISATION.reportTitle)}
+          ${escapeHtml(title)}
         </title>
 
         <style>
@@ -991,6 +1007,11 @@ async function generateGroupAllocationPdf(data) {
     /*
      * Puppeteer creates the repeating header.
      *
+     * IMPORTANT:
+     * Pass data.title here so the custom title
+     * entered in the frontend appears in the
+     * PDF header.
+     *
      * Footer is intentionally left blank because
      * page numbers are added reliably afterward
      * using pdf-lib.
@@ -1003,7 +1024,7 @@ async function generateGroupAllocationPdf(data) {
 
       displayHeaderFooter: true,
 
-      headerTemplate: buildHeaderTemplate(logoDataUri),
+      headerTemplate: buildHeaderTemplate(logoDataUri, data?.title),
 
       footerTemplate: "<div></div>",
 
