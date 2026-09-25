@@ -29,7 +29,7 @@ const MAX_REASONABLE_AGE = 120;
 const ORGANISATION = {
   name: "BANNERUGHATTA BIOLOGICAL PARK",
   programme: "ZOO CLUB 2026 - 2027",
-  reportTitle: "STUDENT GROUP ALLOCATION DETAILS",
+  reportTitle: "GROUP ALLOCATION DETAILS",
 };
 
 /** Logo file name. The same file is used by the website and the PDF. */
