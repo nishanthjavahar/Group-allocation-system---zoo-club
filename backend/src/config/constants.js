@@ -28,7 +28,9 @@ const MAX_REASONABLE_AGE = 120;
 /** Organisation details used by the UI header and the PDF report. */
 const ORGANISATION = {
   name: "BANNERUGHATTA BIOLOGICAL PARK",
+
   programme: "Group Allocation System",
+
   reportTitle: "GROUP ALLOCATION DETAILS",
 };
 

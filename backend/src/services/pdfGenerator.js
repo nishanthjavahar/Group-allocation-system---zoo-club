@@ -382,6 +382,8 @@ function buildHeaderTemplate(logoDataUri, title) {
         "
       >
 
+        <!-- ORGANISATION NAME - FIXED -->
+
         <div
           style="
             font-size:15px;
@@ -393,6 +395,9 @@ function buildHeaderTemplate(logoDataUri, title) {
           ${escapeHtml(ORGANISATION.name)}
         </div>
 
+
+        <!-- CUSTOM PROGRAMME / REPORT NAME -->
+
         <div
           style="
             font-size:11px;
@@ -401,8 +406,11 @@ function buildHeaderTemplate(logoDataUri, title) {
             margin-top:4px;
           "
         >
-          ${escapeHtml(ORGANISATION.programme)}
+          ${escapeHtml(title)}
         </div>
+
+
+        <!-- REPORT TYPE - FIXED -->
 
         <div
           style="
@@ -412,8 +420,11 @@ function buildHeaderTemplate(logoDataUri, title) {
             margin-top:6px;
           "
         >
-          ${escapeHtml(title)}
+          ${escapeHtml(ORGANISATION.reportTitle)}
         </div>
+
+
+        <!-- GENERATED DATE -->
 
         <div
           style="
@@ -427,6 +438,7 @@ function buildHeaderTemplate(logoDataUri, title) {
         </div>
 
       </div>
+
     </div>
   `;
 }
