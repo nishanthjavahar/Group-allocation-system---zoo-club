@@ -133,29 +133,162 @@ function renderAgeDistributionTable(ageDistribution = []) {
    GROUP TABLE
 ========================================================= */
 
-function renderGroupTable(group) {
+function normalisePdfFields(pdfFields = ["name", "dob", "age"]) {
+  const allowedFields = new Set(["name", "dob", "age"]);
+
+  const fields = Array.isArray(pdfFields)
+    ? pdfFields.filter((field) => allowedFields.has(field))
+    : ["name", "dob", "age"];
+
+  return [...new Set(fields)];
+}
+
+function getGroupTableColumns(pdfFields) {
+  const selectedDataFields = pdfFields.filter((field) =>
+    ["name", "dob", "age"].includes(field),
+  );
+
+  /*
+   * The serial number occupies 12%.
+   *
+   * The remaining 88% is dynamically distributed
+   * depending on which fields were selected.
+   */
+  const dataWidths = {
+    1: {
+      name: "88%",
+      dob: "88%",
+      age: "88%",
+    },
+
+    2: {
+      name: "58%",
+      dob: "38%",
+      age: "30%",
+    },
+
+    3: {
+      name: "40%",
+      dob: "33%",
+      age: "15%",
+    },
+  };
+
+  const widths = dataWidths[selectedDataFields.length] || dataWidths[3];
+
+  const columns = [
+    {
+      key: "serial",
+      label: "Sl. No.",
+      className: "sl-column",
+      width: "12%",
+    },
+  ];
+
+  if (pdfFields.includes("name")) {
+    columns.push({
+      key: "name",
+      label: "Student Name",
+      className: "student-name-column",
+      width: widths.name,
+    });
+  }
+
+  if (pdfFields.includes("dob")) {
+    columns.push({
+      key: "dob",
+      label: "Date of Birth",
+      className: "dob-column",
+      width: widths.dob,
+    });
+  }
+
+  if (pdfFields.includes("age")) {
+    columns.push({
+      key: "age",
+      label: "Age",
+      className: "age-column",
+      width: widths.age,
+    });
+  }
+
+  return columns;
+}
+
+function renderGroupTable(group, pdfFields) {
   const students = sortStudentsOldestFirst(group.students || []);
 
+  const columns = getGroupTableColumns(pdfFields);
+
   const rows = students
-    .map(
-      (student, index) => `
+    .map((student, index) => {
+      const cells = columns
+        .map((column) => {
+          /*
+           * Serial number
+           */
+          if (column.key === "serial") {
+            return `
+              <td class="serial-number">
+                ${index + 1}
+              </td>
+            `;
+          }
+
+          /*
+           * Student name
+           */
+          if (column.key === "name") {
+            return `
+              <td class="student-name">
+                ${escapeHtml(student.name)}
+              </td>
+            `;
+          }
+
+          /*
+           * Date of birth
+           */
+          if (column.key === "dob") {
+            return `
+              <td>
+                ${escapeHtml(student.dobDisplay || student.dob || "")}
+              </td>
+            `;
+          }
+
+          /*
+           * Age
+           */
+          if (column.key === "age") {
+            return `
+              <td class="age-cell">
+                ${escapeHtml(student.age)}
+              </td>
+            `;
+          }
+
+          return "";
+        })
+        .join("");
+
+      return `
         <tr>
-          <td class="serial-number">
-            ${index + 1}
-          </td>
-
-          <td class="student-name">
-            ${escapeHtml(student.name)}
-          </td>
-
-          <td>
-            ${escapeHtml(student.dobDisplay || student.dob || "")}
-          </td>
-
-          <td class="age-cell">
-            ${escapeHtml(student.age)}
-          </td>
+          ${cells}
         </tr>
+      `;
+    })
+    .join("");
+
+  const headers = columns
+    .map(
+      (column) => `
+        <th
+          class="${column.className}"
+          style="width:${column.width};"
+        >
+          ${column.label}
+        </th>
       `,
     )
     .join("");
@@ -164,6 +297,7 @@ function renderGroupTable(group) {
     <section class="group-section">
 
       <div class="group-heading">
+
         <div class="group-title">
           Group ${escapeHtml(group.groupNumber)}
         </div>
@@ -171,27 +305,14 @@ function renderGroupTable(group) {
         <div class="group-count">
           ${students.length} students
         </div>
+
       </div>
 
       <table class="group-table">
 
         <thead>
           <tr>
-            <th class="sl-column">
-              Sl. No.
-            </th>
-
-            <th class="student-name-column">
-              Student Name
-            </th>
-
-            <th class="dob-column">
-              Date of Birth
-            </th>
-
-            <th class="age-column">
-              Age
-            </th>
+            ${headers}
           </tr>
         </thead>
 
@@ -200,6 +321,7 @@ function renderGroupTable(group) {
         </tbody>
 
       </table>
+
     </section>
   `;
 }
@@ -393,7 +515,14 @@ async function addPdfFooter(pdfBuffer) {
 ========================================================= */
 
 function buildReportHtml(data) {
-  const { groups = [], ageDistribution = [], summary = {} } = data || {};
+  const {
+    groups = [],
+    ageDistribution = [],
+    summary = {},
+    pdfFields: rawPdfFields,
+  } = data || {};
+
+  const pdfFields = normalisePdfFields(rawPdfFields);
 
   const totalStudents = Number(summary.totalStudents ?? 0);
 
@@ -755,7 +884,6 @@ function buildReportHtml(data) {
 
           </div>
 
-
           <div class="summary-item">
 
             <span class="summary-label">
@@ -767,7 +895,6 @@ function buildReportHtml(data) {
             </span>
 
           </div>
-
 
           <div class="summary-item">
 
@@ -783,15 +910,19 @@ function buildReportHtml(data) {
 
         </div>
 
-
         <!-- AGE DISTRIBUTION -->
 
-        <h2 class="section-heading">
-          <span>Age Distribution</span>
-        </h2>
+        ${
+          pdfFields.includes("age")
+            ? `
+              <h2 class="section-heading">
+                <span>Age Distribution</span>
+              </h2>
 
-        ${renderAgeDistributionTable(ageDistribution)}
-
+              ${renderAgeDistributionTable(ageDistribution)}
+            `
+            : ""
+        }
 
         <!-- GROUP ALLOCATION -->
 
@@ -799,7 +930,7 @@ function buildReportHtml(data) {
           <span>Group Allocation</span>
         </h2>
 
-        ${groups.map(renderGroupTable).join("")}
+        ${groups.map((group) => renderGroupTable(group, pdfFields)).join("")}
 
       </body>
 
@@ -822,6 +953,7 @@ async function generateGroupAllocationPdf(data) {
     /*
      * Chromium is supplied by @sparticuz/chromium.
      */
+
     const executablePath = await chromium.executablePath();
 
     console.log("Chromium executable:", executablePath);

@@ -40,8 +40,15 @@ export default function Home() {
 
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const [result, setResult] = useState(null);
+  const [showPdfOptions, setShowPdfOptions] = useState(false);
 
+  const [pdfFields, setPdfFields] = useState({
+    name: true,
+    dob: false,
+    age: false,
+  });
+
+  const [result, setResult] = useState(null);
   // Students excluded because of the selected age criteria.
   const [excludedStudents, setExcludedStudents] = useState([]);
 
@@ -212,11 +219,44 @@ export default function Home() {
   // DOWNLOAD PDF
   // =========================================================
 
+  function openPdfOptions() {
+    setErrors([]);
+    setShowPdfOptions(true);
+  }
+
+  function closePdfOptions() {
+    if (!isDownloading) {
+      setShowPdfOptions(false);
+    }
+  }
+
+  function togglePdfField(field) {
+    setPdfFields((current) => ({
+      ...current,
+      [field]: !current[field],
+    }));
+  }
+
   async function handleDownloadPdf() {
+    const include = Object.entries(pdfFields)
+      .filter(([, selected]) => selected)
+      .map(([field]) => field);
+
+    if (include.length === 0) {
+      setErrors(["Please select at least one student field for the PDF."]);
+      return;
+    }
+
     setIsDownloading(true);
 
     try {
-      await downloadGroupsPdf(nonEmptyStudents, Number(numberOfGroups));
+      await downloadGroupsPdf(
+        nonEmptyStudents,
+        Number(numberOfGroups),
+        include,
+      );
+
+      setShowPdfOptions(false);
     } catch (err) {
       setErrors(err.details || [err.message || "Unable to download the PDF."]);
     } finally {
@@ -455,13 +495,107 @@ export default function Home() {
               <GroupPreview
                 result={result}
                 onRegenerate={() => handleGenerate(false)}
-                onDownloadPdf={handleDownloadPdf}
+                onDownloadPdf={openPdfOptions}
                 isDownloading={isDownloading}
               />
             </div>
           )}
         </main>
+        {/* =================================================
+    PDF OPTIONS MODAL
+================================================= */}
 
+        {showPdfOptions && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-options-title"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closePdfOptions();
+              }
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3
+                    id="pdf-options-title"
+                    className="text-lg font-bold text-forest-900"
+                  >
+                    PDF Download Options
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Choose the student information you want to include.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closePdfOptions}
+                  disabled={isDownloading}
+                  aria-label="Close PDF options"
+                  className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                >
+                  <span className="text-xl leading-none">&times;</span>
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {[
+                  { key: "name", label: "Student Name" },
+                  { key: "dob", label: "Date of Birth" },
+                  { key: "age", label: "Age" },
+                ].map((field) => (
+                  <label
+                    key={field.key}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 transition hover:border-forest-200 hover:bg-forest-50/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pdfFields[field.key]}
+                      onChange={() => togglePdfField(field.key)}
+                      disabled={isDownloading}
+                      className="h-4 w-4 rounded border-gray-300 text-forest-600 focus:ring-forest-500"
+                    />
+
+                    <span className="text-sm font-medium text-gray-700">
+                      {field.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-xs leading-5 text-gray-500">
+                Serial number is always included to keep the group list easy to
+                reference. Age Distribution is included only when{" "}
+                <strong>Age</strong> is selected.
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={closePdfOptions}
+                  disabled={isDownloading}
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloading}
+                  className="rounded-xl bg-forest-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isDownloading ? "Preparing PDF..." : "Generate PDF"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* =================================================
             FOOTER
         ================================================= */}

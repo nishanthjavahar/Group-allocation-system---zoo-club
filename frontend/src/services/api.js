@@ -140,13 +140,18 @@ export async function parseExcelFile(file) {
  * Uses the same students and numberOfGroups already used
  * to generate the on-screen preview.
  */
-export async function downloadGroupsPdf(students, numberOfGroups) {
+export async function downloadGroupsPdf(
+  students,
+  numberOfGroups,
+  include = ["name", "dob", "age"],
+) {
   try {
     const response = await client.post(
       "/groups/pdf",
       {
         students,
         numberOfGroups,
+        include,
       },
       {
         responseType: "blob",
